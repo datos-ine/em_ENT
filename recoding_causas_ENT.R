@@ -157,3 +157,5 @@ datos_causa <- datos |>
         "Neoplasias",
     )
   )
+
+## Reasignar códigos basura
