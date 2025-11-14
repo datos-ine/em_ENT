@@ -2,8 +2,7 @@
 ### Limpieza del dataset: Defunciones Generales Mensuales ocurridas y
 ### registradas en la República Argentina (2010-2022)
 ### Autora: Tamara Ricardo
-### Fecha modificación:
-# 2025-10-14 10:25:43
+# Última modificación: 14-11-2025 10:11
 
 # Cargar paquetes --------------------------------------------------------
 pacman::p_load(
@@ -16,8 +15,7 @@ pacman::p_load(
 
 # Cargar datos -----------------------------------------------------------
 ## Códigos provincias ----
-cod_prov <- show_arg_codes() |>
-  # Filtrar totales
+cod_prov <- show_arg_codes() |> # Filtrar totales
   filter(between(codprov, "01", "24")) |>
 
   # Códigos a numérico
@@ -57,7 +55,7 @@ datos <- datos_raw |>
   # Estandarizar nombres de columnas
   rename(
     sexo = sexo_id,
-    cie10_grupo = grupo_causa_defuncion_CIE10,
+    cie10_cat = grupo_causa_defuncion_CIE10,
     cie10_cod = cod_causa_muerte_CIE10
   ) |>
 
@@ -77,9 +75,13 @@ datos <- datos_raw |>
     "07.de 80 años y más"
   )) |>
 
-  # Modificar código CIE10
+  # Estandarizar código CIE-10
   mutate(
-    cie10_cod = paste0(str_sub(cie10_cod, 1, 3), ".", str_sub(cie10_cod, 4))
+    cie10_cod = if_else(
+      str_detect(cie10_cod, "[Xx]$"),
+      str_replace(cie10_cod, "[Xx]$", ".0"),
+      paste0(str_sub(cie10_cod, 1, 3), ".", str_sub(cie10_cod, 4))
+    )
   ) |>
 
   # Modificar etiquetas sexo
@@ -110,10 +112,7 @@ datos <- datos_raw |>
   ) |>
 
   # Jurisdicción a numérico
-  mutate(
-    prov_id = str_remove(jurisdiccion, "\\..*") |>
-      parse_number()
-  ) |>
+  mutate(prov_id = parse_number(jurisdiccion)) |>
 
   # Crear variable para nombre de provincia
   left_join(
@@ -123,7 +122,7 @@ datos <- datos_raw |>
 
   # Crear columna para jurisdicción categorizada
   mutate(
-    prov_cat = if_else(
+    prov_region = if_else(
       !is.na(prov_nombre),
       prov_nombre,
       region
@@ -134,18 +133,18 @@ datos <- datos_raw |>
   count(
     anio_def,
     mes_def,
-    prov_cat,
+    prov_region,
     region,
     sexo,
     grupo_etario,
-    cie10_grupo,
+    cie10_cat,
     cie10_cod,
     wt = cantidad
   )
 
 
 # Exportar datos ---------------------------------------------------------
-export(
-  datos,
-  "clean/defun_mensuales_arg_2010_2022.csv"
-)
+export(datos, file = "clean/defun_mensuales_arg_2010_2022.csv")
+
+### Limpiar environment
+rm(list = ls())
