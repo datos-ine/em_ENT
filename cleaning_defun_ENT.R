@@ -2,7 +2,7 @@
 ### Limpieza del dataset: Defunciones Generales Mensuales ocurridas y
 ### registradas en la República Argentina (2010-2022)
 ### Autora: Tamara Ricardo
-# Última modificación: 14-11-2025 10:11
+# Última modificación: 18-11-2025 12:10
 
 # Cargar paquetes --------------------------------------------------------
 pacman::p_load(
@@ -55,6 +55,7 @@ datos <- datos_raw |>
   # Estandarizar nombres de columnas
   rename(
     sexo = sexo_id,
+    grupo_edad = grupo_etario,
     cie10_cat = grupo_causa_defuncion_CIE10,
     cie10_cod = cod_causa_muerte_CIE10
   ) |>
@@ -70,7 +71,7 @@ datos <- datos_raw |>
 
   # Filtrar menores de 20 años y datos ausentes grupo etario
   filter(between(
-    grupo_etario,
+    grupo_edad,
     "02.de 20 a 39 años",
     "07.de 80 años y más"
   )) |>
@@ -89,7 +90,7 @@ datos <- datos_raw |>
 
   # Modificar etiquetas grupo etario
   mutate(
-    grupo_etario = str_sub(grupo_etario, 7) |>
+    grupo_edad = str_sub(grupo_edad, 7) |>
       fct_recode("80+ años" = "80 años y más")
   ) |>
 
@@ -136,7 +137,7 @@ datos <- datos_raw |>
     prov_region,
     region,
     sexo,
-    grupo_etario,
+    grupo_edad,
     cie10_cat,
     cie10_cod,
     wt = cantidad
