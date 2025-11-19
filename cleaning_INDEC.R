@@ -1,8 +1,8 @@
 ### Exceso de mortalidad por ENT en Argentina durante la pandemia de COVID-19
 ### Limpieza de los datasets de proyecciones poblacionales 2010-2040 y población
-### según censos nacionales 2010 y 2022
+### según Censo Nacional 2022
 ### Autora: Tamara Ricardo
-# Última modificación: 18-11-2025 12:36
+# Última modificación: 19-11-2025 13:13
 
 # Cargar paquetes ---------------------------------------------------------
 pacman::p_load(
@@ -24,75 +24,42 @@ pob_22_raw <- import("raw/_tmp_7830741.xlsX", range = "B10:D680")
 
 # Limpiar datos ----------------------------------------------------------
 ## Proyecciones 2010-2023 ----
-proy_10_23 <- # Proyecciones 2010-2015
-  excel_sheets(proy_10_23_raw)[-c(1:2)] |>
-
-  # Crear columna para provincia
-  set_names() |>
-
-  # Unir por provincia
-  map(~ read_excel(proy_10_23_raw, sheet = .x, range = "A3:X28")) |>
-  list_rbind(names_to = "prov") |>
-
-  # Añadir proyecciones 2016-2021
-  bind_cols(
-    excel_sheets(proy_10_23_raw)[-c(1:2)] |>
-
-      # Crear columna para provincia
-      set_names() |>
-
-      # Unir por provincia
-      map(~ read_excel(proy_10_23_raw, sheet = .x, range = "A31:X56")) |>
-      list_rbind(names_to = "prov")
-  ) |>
-
-  # Añadir proyecciones 2022-2023
-  bind_cols(
-    excel_sheets(proy_10_23_raw)[-c(1:2)] |>
-
-      # Crear columna para provincia
-      set_names() |>
-
-      # Unir por provincia
-      map(~ read_excel(proy_10_23_raw, sheet = .x, range = "A59:H84")) |>
-      list_rbind(names_to = "prov")
-  ) |>
+proy_10_23 <- map(
+  c("A3:X28", "A31:X56", "A59:H84"),
+  ~ excel_sheets(proy_10_23_raw)[-c(1:2)] |>
+    set_names() |>
+    map(\(x) read_excel(proy_10_23_raw, sheet = x, range = .x)) |>
+    list_rbind(names_to = "prov")
+) |>
+  list_cbind() |>
 
   # Estandarizar nombres de columnas
   clean_names() |>
 
-  # Seleccionar columnas relevantes
+  # Filtrar columnas con totales y repetidas
   select(
+    -starts_with("x201"),
+    -starts_with("x202"),
+    -(starts_with("prov_") & !matches("prov_1$")),
+    -(starts_with("edad_") & !matches("edad_2$"))
+  ) |>
+
+  # Filtrar columnas vacías
+  remove_empty(which = "cols") |>
+
+  # Renombrar columnas
+  rename(
     prov_id = prov_1,
-    grupo_edad_5 = edad_2,
-    Masculino_2010 = x4,
-    Femenino_2010 = x5,
-    Masculino_2011 = x8,
-    Femenino_2011 = x9,
-    Masculino_2012 = x12,
-    Femenino_2012 = x13,
-    Masculino_2013 = x16,
-    Femenino_2013 = x17,
-    Masculino_2014 = x20,
-    Femenino_2014 = x21,
-    Masculino_2015 = x24,
-    Femenino_2015 = x25,
-    Masculino_2016 = x29,
-    Femenino_2016 = x30,
-    Masculino_2017 = x33,
-    Femenino_2017 = x34,
-    Masculino_2018 = x37,
-    Femenino_2018 = x38,
-    Masculino_2019 = x41,
-    Femenino_2019 = x42,
-    Masculino_2020 = x45,
-    Femenino_2020 = x46,
-    Masculino_2021 = x49,
-    Femenino_2021 = x50,
-    Masculino_2022 = x54,
-    Femenino_2022 = x55,
-    Masculino_2023 = x58,
-    Femenino_2023 = x59,
+    grupo_edad_5 = edad_2
+  ) |>
+
+  rename_with(
+    .cols = c(x4:x59),
+    .fn = ~ paste0(
+      rep(c("Masculino", "Femenino"), length(.x) / 2),
+      "_",
+      rep(2010:2023, each = 2)
+    )
   ) |>
 
   # Crear id numérico de provincia
@@ -105,13 +72,28 @@ proy_10_23 <- # Proyecciones 2010-2015
   filter(!grupo_edad_5 %in% c("0-4", "5-9", "10-14", "15-19", "Total")) |>
 
   # Pasar a formato long
-  pivot_longer(
-    cols = c(Masculino_2010:Femenino_2023),
-    values_to = "pob"
-  ) |>
+  pivot_longer(cols = c(Masculino_2010:Femenino_2023)) |>
 
   # Separar año y sexo
-  separate_wider_delim(name, delim = "_", names = c("sexo", "anio"))
+  separate_wider_delim(name, delim = "_", names = c("sexo", "anio")) |>
+
+  # Crear grupo etario ampliado
+  mutate(
+    grupo_edad = case_when(
+      between(grupo_edad_5, "20-24", "35-39") ~ "20 a 39 años",
+      between(grupo_edad_5, "40-44", "45-49") ~ "40 a 49 años",
+      between(grupo_edad_5, "50-54", "55-59") ~ "50 a 59 años",
+      between(grupo_edad_5, "60-64", "65-69") ~ "60 a 69 años",
+      between(grupo_edad_5, "70-74", "75-79") ~ "70 a 79 años",
+      .default = "80+ años"
+    )
+  ) |>
+
+  # Población y año a numérico
+  mutate(across(.cols = c(anio, value), .fns = ~ parse_number(.x))) |>
+
+  # Reagrupar datos
+  count(anio, prov_id, grupo_edad, sexo, wt = value, name = "proy_pob")
 
 
 ## Población Censo 2022 ----
@@ -133,8 +115,18 @@ pob_22 <- pob_22_raw |>
     )
   ) |>
 
+  # Crear id categórico de provincia
+  mutate(
+    prov_nombre = if_else(
+      str_detect(grupo_edad_5, "AREA"),
+      Femenino,
+      NA
+    ) |>
+      str_replace("Caba", "CABA")
+  ) |>
+
   # Completar filas
-  fill(prov_id, .direction = "down") |>
+  fill(c(prov_id, prov_nombre), .direction = "down") |>
 
   # Quitar NAs
   drop_na() |>
@@ -148,8 +140,32 @@ pob_22 <- pob_22_raw |>
   # Pasar a formato long
   pivot_longer(
     cols = c(Femenino, Masculino),
-    names_to = "sexo",
-    values_to = "pob_est_2022"
+    names_to = "sexo"
+  ) |>
+
+  # Crear grupo etario ampliado
+  mutate(
+    grupo_edad = case_when(
+      between(grupo_edad_5, "20 a 24", "35 a 39") ~ "20 a 39 años",
+      between(grupo_edad_5, "40 a 44", "45 a 49") ~ "40 a 49 años",
+      between(grupo_edad_5, "50 a 54", "55 a 59") ~ "50 a 59 años",
+      between(grupo_edad_5, "60 a 64", "65 a 69") ~ "60 a 69 años",
+      between(grupo_edad_5, "70 a 74", "75 a 79") ~ "70 a 79 años",
+      .default = "80+ años"
+    )
+  ) |>
+
+  # Población a numérico
+  mutate(value = parse_number(value, na = "-")) |>
+
+  # Reagrupar datos
+  count(
+    prov_id,
+    prov_nombre,
+    grupo_edad,
+    sexo,
+    wt = value,
+    name = "pob_est_2022"
   )
 
 
@@ -158,31 +174,8 @@ pob_2010_2023 <- proy_10_23 |>
   # Añadir población estándar 2022
   left_join(pob_22) |>
 
-  # Crear grupo etario ampliado
-  mutate(
-    grupo_edad = case_when(
-      between(grupo_edad_5, "20-24", "35-39") ~ "20 a 39 años",
-      between(grupo_edad_5, "40-44", "45-49") ~ "40 a 49 años",
-      between(grupo_edad_5, "50-54", "55-59") ~ "50 a 59 años",
-      between(grupo_edad_5, "60-64", "65-69") ~ "60 a 69 años",
-      between(grupo_edad_5, "70-74", "75-79") ~ "70 a 79 años",
-      .default = "80+ años"
-    )
-  ) |>
-
-  # Población y año a numérico
-  mutate(across(
-    .cols = c(anio, pob, pob_est_2022),
-    .fns = ~ parse_number(.x, na = "-")
-  )) |>
-
-  # Reagrupar datos
-  group_by(prov_id, anio, grupo_edad, sexo) |>
-  summarise(
-    poblacion = sum(pob, na.rm = TRUE),
-    pob_est_2022 = sum(pob_est_2022, na.rm = TRUE),
-    .groups = "drop"
-  )
+  # Ordenar columnas
+  select(anio, starts_with("prov_"), everything())
 
 
 # Estimar población mensual ----------------------------------------------
@@ -219,7 +212,7 @@ pob_mensual <- pob_2010_2023 |>
 
   # Interpolación lineal
   mutate(
-    pob_mensual = na.approx(poblacion, x = fecha, na.rm = FALSE)
+    pob_mensual = na.approx(proy_pob, x = fecha, na.rm = FALSE)
   ) |>
   ungroup() |>
 
