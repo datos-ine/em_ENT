@@ -2,7 +2,7 @@
 ### Limpieza de los datasets de proyecciones poblacionales 2010-2040 y población
 ### según Censo Nacional 2022
 ### Autora: Tamara Ricardo
-# Última modificación: 19-11-2025 13:13
+# Última modificación: 20-11-2025 09:45
 
 # Cargar paquetes ---------------------------------------------------------
 pacman::p_load(
@@ -16,19 +16,19 @@ pacman::p_load(
 
 # Cargar datos ------------------------------------------------------------
 ## Proyecciones 2010-2021
-proy_10_23_raw <- "raw/c2_proyecciones_prov_2010_2040.xls"
+proy_2010_2023_raw <- "raw/c2_proyecciones_prov_2010_2040.xls"
 
 ## Población Estándar Censo 2022 (INDEC)
-pob_22_raw <- import("raw/_tmp_7830741.xlsX", range = "B10:D680")
+pob_2022_raw <- import("raw/_tmp_7830741.xlsX", range = "B10:D680")
 
 
 # Limpiar datos ----------------------------------------------------------
 ## Proyecciones 2010-2023 ----
-proy_10_23 <- map(
+proy_2010_2023 <- map(
   c("A3:X28", "A31:X56", "A59:H84"),
-  ~ excel_sheets(proy_10_23_raw)[-c(1:2)] |>
+  ~ excel_sheets(proy_2010_2023_raw)[-c(1:2)] |>
     set_names() |>
-    map(\(x) read_excel(proy_10_23_raw, sheet = x, range = .x)) |>
+    map(\(x) read_excel(proy_2010_2023_raw, sheet = x, range = .x)) |>
     list_rbind(names_to = "prov")
 ) |>
   list_cbind() |>
@@ -97,7 +97,7 @@ proy_10_23 <- map(
 
 
 ## Población Censo 2022 ----
-pob_22 <- pob_22_raw |>
+pob_2022 <- pob_2022_raw |>
   # Estandarizar nombre de columnas
   clean_names() |>
   rename(
@@ -170,16 +170,19 @@ pob_22 <- pob_22_raw |>
 
 
 # Unir los datasets ------------------------------------------------------
-pob_2010_2023 <- proy_10_23 |>
+pob_2010_2023 <- proy_2010_2023 |>
   # Añadir población estándar 2022
-  left_join(pob_22) |>
+  left_join(pob_2022) |>
+
+  # Filtrar filas de 2023
+  filter(anio < 2023) |>
 
   # Ordenar columnas
   select(anio, starts_with("prov_"), everything())
 
 
 # Estimar población mensual ----------------------------------------------
-pob_mensual <- pob_2010_2023 |>
+pob_mensual <- proy_2010_2023 |>
   # Expandir datset
   expand(
     prov_id,
@@ -200,7 +203,7 @@ pob_mensual <- pob_2010_2023 |>
 
   # Unir con base población anual
   left_join(
-    pob_2010_2023 |>
+    proy_2010_2023 |>
       mutate(fecha = make_date(anio))
   ) |>
 
@@ -212,27 +215,35 @@ pob_mensual <- pob_2010_2023 |>
 
   # Interpolación lineal
   mutate(
-    pob_mensual = na.approx(proy_pob, x = fecha, na.rm = FALSE)
+    proy_pob_mensual = na.approx(proy_pob, x = fecha, na.rm = FALSE)
   ) |>
   ungroup() |>
 
-  # Quitar columnas no relevantes
-  select(anio, mes, prov_id, grupo_edad, sexo, pob_mensual) |>
+  # Añadir población estándar 2022
+  left_join(pob_2022) |>
 
   # Quitar filas de 2023
-  filter(anio < 2023)
+  filter(anio < 2023) |>
+
+  # Quitar columnas no relevantes
+  select(
+    anio,
+    mes,
+    prov_id,
+    grupo_edad,
+    sexo,
+    proy_pob_mensual,
+    pob_est_2022
+  )
 
 
 # Guardar datos limpios --------------------------------------------------
 ## Proyecciones anuales y población estándar 2022
-pob_2010_2023 |>
-  filter(anio < 2023) |>
-  export(file = "clean/indec_pob_2010_2022.csv")
+export(pob_2010_2023, file = "clean/indec_pob_anual_2010_2022.csv")
 
 
 ## Proyecciones mensuales
-pob_mensual |>
-  export(file = "clean/indec_pob_mensual_2010_2022.csv")
+export(pob_mensual, file = "clean/indec_pob_mensual_2010_2022.csv")
 
 
 ## Limpiar environment

@@ -2,7 +2,7 @@
 ### Limpieza del dataset: Defunciones Generales Mensuales ocurridas y
 ### registradas en la República Argentina (2010-2022) - DEIS - MSAL
 ### Autora: Tamara Ricardo
-# Última modificación: 20-11-2025 09:10
+# Última modificación: 20-11-2025 09:27
 
 # Cargar paquetes --------------------------------------------------------
 pacman::p_load(
@@ -121,9 +121,9 @@ datos <- datos_raw |>
       select(prov_id = codprov_censo, prov_nombre)
   ) |>
 
-  # Crear columna para jurisdicción categorizada
+  # Modificar niveles jurisdicción
   mutate(
-    prov_region = if_else(
+    jurisdiccion = if_else(
       !is.na(prov_nombre),
       prov_nombre,
       region
@@ -134,14 +134,14 @@ datos <- datos_raw |>
   count(
     anio_def,
     mes_def,
-    prov_region,
     region,
+    jurisdiccion,
     sexo,
     grupo_edad,
     cie10_grupo,
     cie10_cod,
     wt = cantidad,
-    name = "n_defun"
+    name = "defun"
   )
 
 
