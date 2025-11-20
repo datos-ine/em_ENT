@@ -1,6 +1,7 @@
 ### Exceso de Mortalidad por ENT en Argentina durante la pandemia de COVID-19
 ### Limpieza códigos ICD-10 para ENT y garbage code según categorías GBD (2023)
 ### Autora: Tamara Ricardo
+# Última modificación: 20-11-2025 08:58
 
 # Cargar paquetes --------------------------------------------------------
 pacman::p_load(
@@ -14,8 +15,7 @@ pacman::p_load(
 icd10_raw <- import(
   "raw/IHME_GBD_2021_COD_CAUSE_ICD_CODE_MAP_Y2024M05D16_0.XLSX",
   skip = 1
-) |>
-  select(-ICD9)
+)
 
 
 # Limpiar dataset --------------------------------------------------------
@@ -23,13 +23,22 @@ icd10 <- icd10_raw |>
   # Estandarizar nombres columnas
   clean_names() |>
 
+  # Descartar códigos ICD9
+  select(-icd9) |>
+
   # Extraer grandes grupos ENT y GC nivel 3 y 4
   filter(
-    str_detect(cause, "Neoplasms") |
-      str_detect(cause, "Cardiovascular") |
-      str_detect(cause, "Chronic resp") |
-      str_detect(cause, "Diabetes mellitus$") |
-      str_detect(cause, "Garbage")
+    cause == "Neoplasms" | # Cáncer
+      cause == "Cardiovascular diseases" | # Enfermedad cardiovascular
+      cause == "Chronic respiratory diseases" | # Enfermedad respiratoria crónica
+      cause == "Diabetes mellitus" | # Diabetes
+      cause == "Parkinson's disease" | # Parkinson
+      cause == "Alzheimer's disease and other dementias" | # Alzheimer y demencias
+      cause == "Alcohol use disorders" | # Alcoholismo
+      cause == "Drug use disorders" | # Uso de drogas
+      cause == "Self-harm" | # Suicidio
+      cause == "COVID-19" | # COVID-19
+      str_detect(cause, "Garbage") # Códigos basura
   ) |>
 
   # Separar en filas
@@ -37,9 +46,6 @@ icd10 <- icd10_raw |>
 
   # Corregir código mal cargado
   mutate(icd10 = if_else(icd10 == "I99-ID5.9", "I99.0", icd10)) |>
-
-  # Añadir fila para I05.9
-  add_row(cause = "Garbage Code (GBD Level 3)", icd10 = "I05.9") |>
 
   # Separar inicio y fin secuencia
   separate_wider_delim(
@@ -76,10 +82,10 @@ icd10 <- icd10_raw |>
   ) |>
 
   # Base long
-  pivot_longer(c(start, end), values_to = "code") |>
+  pivot_longer(c(start, end)) |>
 
   # Separar código en número y letra
-  separate_wider_position(code, widths = c(letra = 1, numero = 4)) |>
+  separate_wider_position(value, widths = c(letra = 1, numero = 4)) |>
 
   # Número a formato numérico
   mutate(numero = parse_number(numero)) |>
@@ -144,3 +150,5 @@ export(icd10, file = "clean/ihme_gbd_2021_codes_clean.csv")
 
 ## Limpiar environment
 rm(list = ls())
+
+pacman::p_unload("all")
