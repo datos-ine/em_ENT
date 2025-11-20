@@ -1,6 +1,6 @@
 ### Exceso de mortalidad por ENTs en Argentina durante la pandemia de COVID-19
 ### Categorización de causas de muerte y reasignación de códigos basura cie-10
-### Autores: Tamara Ricardo, Juan Irassar
+### Autora: Tamara Ricardo
 # Última modificación: 13-11-2025 09:09
 
 # Cargar paquetes --------------------------------------------------------

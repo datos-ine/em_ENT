@@ -1,8 +1,8 @@
 ### Exceso de mortalidad por ENTs en Argentina durante la pandemia de COVID-19
 ### Limpieza del dataset: Defunciones Generales Mensuales ocurridas y
-### registradas en la República Argentina (2010-2022)
+### registradas en la República Argentina (2010-2022) - DEIS - MSAL
 ### Autora: Tamara Ricardo
-# Última modificación: 18-11-2025 12:10
+# Última modificación: 20-11-2025 09:10
 
 # Cargar paquetes --------------------------------------------------------
 pacman::p_load(
@@ -56,7 +56,7 @@ datos <- datos_raw |>
   rename(
     sexo = sexo_id,
     grupo_edad = grupo_etario,
-    cie10_cat = grupo_causa_defuncion_CIE10,
+    cie10_grupo = grupo_causa_defuncion_CIE10,
     cie10_cod = cod_causa_muerte_CIE10
   ) |>
 
@@ -76,7 +76,7 @@ datos <- datos_raw |>
     "07.de 80 años y más"
   )) |>
 
-  # Estandarizar código CIE-10
+  # Estandarizar códigos CIE-10
   mutate(
     cie10_cod = if_else(
       str_detect(cie10_cod, "[Xx]$"),
@@ -138,14 +138,17 @@ datos <- datos_raw |>
     region,
     sexo,
     grupo_edad,
-    cie10_cat,
+    cie10_grupo,
     cie10_cod,
-    wt = cantidad
+    wt = cantidad,
+    name = "n_defun"
   )
 
 
 # Exportar datos ---------------------------------------------------------
-export(datos, file = "clean/defun_mensuales_arg_2010_2022.csv")
+export(datos, file = "clean/deis_defun_mensuales_2010_2022.csv")
 
 ### Limpiar environment
 rm(list = ls())
+
+pacman::p_unload("all")
